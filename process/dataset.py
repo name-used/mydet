@@ -10,7 +10,6 @@ from mmcv.transforms import Compose
 
 
 class Dataset(DatasetInterface):
-    # 不含 pipeline，原尺寸读图，需要读完数据之后在 pipeline 中转格式
     def __init__(self, source: List[Dict[str, Any]], base_zoom: float, patch_size: int, pipeline: list, use_bbox: bool = True, use_mask: bool = True, use_seg: bool = True):
         self.sample_basics = []
         self.images = []
@@ -60,11 +59,11 @@ class Dataset(DatasetInterface):
         return len(self.samples)
 
     def __getitem__(self, item: int):
-        i, (left, up, k) = self.samples[item]
-        returns = dict(image=self.load_image(i, left, up, k, k))
-        if self.bboxes: returns['bbox'] = self.load_bbox(i, left, up, k, k)
-        if self.masks: returns['mask'] = self.load_mask(i, left, up, k, k)
-        if self.segs: returns['seg'] = self.load_seg(i, left, up, k, k)
+        i, (l, u, r, d) = self.samples[item]
+        returns = dict(image=self.load_image(i, l, u, r, d))
+        if self.bboxes: returns['bbox'] = self.load_bbox(i, l, u, r, d)
+        if self.masks: returns['mask'] = self.load_mask(i, l, u, r, d)
+        if self.segs: returns['seg'] = self.load_seg(i, l, u, r, d)
         return self.transform_as_mmdet(returns)
 
     def sample_random(self):
@@ -80,8 +79,8 @@ class Dataset(DatasetInterface):
                 h = max(h, k)
                 # 随机坐标
                 left = round(random.random() * (w - k))
-                up = round(random.random() * (w - k))
-                self.samples.append((i, (left, up, k)))
+                up = round(random.random() * (h - k))
+                self.samples.append((i, (left, up, left+k, up+k)))
         random.shuffle(self.samples)
 
     def sample_by_step(self):
@@ -92,21 +91,18 @@ class Dataset(DatasetInterface):
             k = round(self.patch_size * self.base_zoom * basic['zoom'])
             for up in J.uniform_iter(h, k, k):
                 for left in J.uniform_iter(w, k, k):
-                    self.samples.append((i, (left, up)))
+                    self.samples.append((i, (left, up, left+k, up+k)))
 
-    def load_image(self, i: int, left: int, up: int, w: int, h: int):
+    def load_image(self, i: int, left: int, up: int, right: int, down: int):
         image = self.images[i]
-        patch = image.region(0, left, up, left+w, up+h)
+        patch = image.region(0, left, up, right, down)
         return patch
 
-    def load_bbox(self, i: int, x: int, y: int, w: int, h: int) -> dict:
+    def load_bbox(self, i: int, left: int, up: int, right: int, down: int) -> dict:
         bbox = self.bboxes[i].copy()
 
         # box area
-        l = x - w // 2
-        u = y - h // 2
-        r = l + w
-        d = u + h
+        l, u, r, d = left, up, right, down
 
         # choose in box
         ignore = 5
@@ -132,26 +128,12 @@ class Dataset(DatasetInterface):
         return dict(type=t, bbox=bbox)
 
     def load_mask(self, *args, **kwargs) -> dict:
-        return {}
+        raise NotImplemented
 
     def load_seg(self, *args, **kwargs) -> dict:
-        return {}
+        raise NotImplemented
 
     def transform_as_mmdet(self, my_return: dict) -> dict:
-        """
-        目标类型大概长这样：
-        batch_data_samples (
-            list[:obj:`DetDataSample`], optional): `gt_instance` or `gt_panoptic_seg` or `gt_sem_seg`.
-            Defaults to None.
-            [{'inputs': Tensor, 'data_samples': PipelineResult}]
-        )
-        Pipeline = mmcv.transforms.Compose(pipeline_configs)
-        PipelineResult = Pipeline({
-            'img_id': 0,
-            'img': np.ndarray(h, w, c):: uint8,
-            'instances': [{'bbox': (l, u, r, d), 'bbox_label': 0}]
-        })
-        """
         data_samples = {'img_id': 0, 'img': my_return['image'], 'instances': []}
         for t, bbox in zip(my_return['bbox']['type'], my_return['bbox']['bbox']):
             data_samples['instances'].append({
@@ -160,21 +142,4 @@ class Dataset(DatasetInterface):
                 'ignore_flag': 0,
             })
         data_samples = self.pipeline(data_samples)
-        # 对空数组好像得做一点修正
-        # if not my_return['bbox']['bbox']:
-        #     data_samples['data_samples'].gt_instances.bboxes = []
-        #     data_samples['data_samples'].gt_instances.bboxes = []
         return data_samples
-        # data_samples = {'img_id': [], 'img': [], 'instances': []}
-        # for j, my_return in enumerate(my_returns):
-        #     data_samples['img_id'].append(j)
-        #     data_samples['img'].append(my_return['image'])
-        #     for t, bbox in zip(my_return['bbox']['type'], my_return['bbox']['bbox']):
-        #         data_samples['instances'].append(
-        #             {
-        #                 'bbox': bbox,
-        #                 'bbox_label': t,
-        #             }
-        #         )
-        # data_samples = self.pipeline(data_samples)
-        # return data_samples

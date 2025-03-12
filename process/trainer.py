@@ -21,8 +21,13 @@ def train(work_root: Path):
     # 加载模型
     model = MODELS.build(configs.model)
     if config.load_from:
-        state_dict = torch.load(config.load_from)
-        model.module.load_state_dict(state_dict)
+        state_dict = torch.load(config.load_from)['state_dict']
+        # 与 num_class 相关的参数需要被重新训练，不需要加载，且加载会报错
+        keys = list(state_dict.keys())
+        for key in keys:
+            if key.startswith('bbox_head') or key == 'dn_query_generator.label_embedding.weight':
+                state_dict.pop(key)
+        model.load_state_dict(state_dict, strict=False)
     model.cuda()
 
     # 加载训练器

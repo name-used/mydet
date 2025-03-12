@@ -10,7 +10,7 @@ import config
 
 
 def main():
-    source_root = Path(rf'D:\jassor_resources')
+    source_root = Path(rf'./resources')
     with open(source_root / rf'key_map.json') as f:
         key_map: Dict[str, str] = json.load(f)
 
@@ -19,7 +19,7 @@ def main():
         'data': {},
     }
     for name, group in key_map.items():
-        image_path = source_root / 'regions' / rf'{name}.jpeg'
+        image_path = source_root / 'images' / rf'{name}.jpg'
         bbox_path = source_root / 'bboxes' / rf'{name}.json'
         if not os.path.exists(image_path): continue
         if not os.path.exists(bbox_path): continue
@@ -35,6 +35,7 @@ def main():
             'bbox_path': bbox_path.__fspath__(),
         }
 
+    source_lib['group']['valid'] = source_lib['group']['train']
     with open('./source.lib', 'w') as f:
         json.dump(source_lib, f, cls=J.JassorJsonEncoder)
 

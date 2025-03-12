@@ -1,4 +1,6 @@
 from typing import List
+
+import torch
 import tqdm
 from mmengine.evaluator import Evaluator
 from mmengine.optim import OptimWrapper
@@ -35,9 +37,10 @@ class Runner:
     def run_test(self, loader: DataLoader, epoch: int = 0):
         self.model.eval()
         n = len(loader)
-        for i, data_samples in enumerate(tqdm.tqdm(loader)):
-            outputs = self.model.val_step(data_samples)
-            print(len(outputs))
+        with torch.no_grad():
+            for i, data_samples in enumerate(tqdm.tqdm(loader)):
+                outputs = self.model.val_step(data_samples)
+                print(outputs)
             # 评估怎么写还需要认真考虑一下
         #     self.evaluator.process(data_samples=outputs, data_batch=data_batch)
         # metrics = self.evaluator.evaluate(n)
