@@ -9,8 +9,8 @@ with open(rf'./source.lib') as f:
 # source_valid = [source_lib['data'][name] for name in source_lib['group']['valid']]
 # source_test = [source_lib['data'][name] for name in source_lib['group']['test']]
 
-source_lib['group']['train'] = source_lib['group']['train'][:1]
-source_lib['group']['valid'] = source_lib['group']['valid'][:1]
+source_lib['group']['train'] = source_lib['group']['train']
+source_lib['group']['valid'] = source_lib['group']['valid']
 
 train = dict(
     source=[source_lib['data'][name] for name in source_lib['group']['train']],
